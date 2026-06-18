@@ -5,6 +5,15 @@ import xml.etree.ElementTree as ET
 import requests
 from bs4 import BeautifulSoup
 from flask import Flask, render_template, jsonify, request
+import os
+from dotenv import load_dotenv
+
+# Load env variables from .env
+load_dotenv()
+
+# Import database and notifier modules
+import database
+import notifier
 
 # Configure logging
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
@@ -12,8 +21,10 @@ logger = logging.getLogger(__name__)
 
 app = Flask(__name__)
 
-# Cache configuration
-cached_notes = None
+# Initialize database on startup
+database.init_db()
+
+# Cache configuration for sync frequency
 last_cache_time = 0
 CACHE_DURATION_SECS = 300  # 5 minutes cache
 
@@ -109,22 +120,43 @@ def fetch_and_parse_release_notes():
     return notes
 
 def get_notes(force_refresh=False):
-    """Retrieve notes with in-memory caching support."""
-    global cached_notes, last_cache_time
+    """Retrieve notes with SQLite storage and automatic SMTP notifications."""
+    global last_cache_time
     now = time.time()
     
-    if force_refresh or not cached_notes or (now - last_cache_time > CACHE_DURATION_SECS):
+    db_empty = database.is_db_empty()
+    
+    # Check if we should sync: forced refresh, empty DB, or cache expired
+    if force_refresh or db_empty or (now - last_cache_time > CACHE_DURATION_SECS):
         try:
-            cached_notes = fetch_and_parse_release_notes()
-            last_cache_time = now
-            logger.info("Successfully fetched and cached release notes.")
-        except Exception as e:
-            logger.error(f"Error fetching notes: {e}")
-            if cached_notes:
-                logger.info("Returning cached copy as fallback.")
+            feed_notes = fetch_and_parse_release_notes()
+            
+            if db_empty:
+                logger.info("First run: seeding local database with historical release notes.")
+                # Seed database, marking historical entries as emailed (sent=True) to prevent spamming
+                database.insert_notes(feed_notes, mark_as_sent=True)
             else:
+                # Insert notes and get the list of newly discovered ones
+                new_notes = database.insert_notes(feed_notes, mark_as_sent=False)
+                
+                if new_notes:
+                    logger.info(f"Discovered {len(new_notes)} new release notes.")
+                    # Try sending email notification for new notes
+                    sent_success = notifier.send_email_notification(new_notes)
+                    if sent_success:
+                        # Mark notes as sent in the database
+                        new_note_ids = [n['id'] for n in new_notes]
+                        database.mark_as_sent(new_note_ids)
+                        
+            last_cache_time = now
+            logger.info("Database synced with release notes feed successfully.")
+        except Exception as e:
+            logger.error(f"Error syncing with XML feed: {e}")
+            if db_empty:
+                # Return empty or raise error if database was never seeded
                 raise e
-    return cached_notes
+                
+    return database.get_all_notes()
 
 @app.route('/')
 def index():
@@ -142,6 +174,61 @@ def api_notes():
         })
     except Exception as e:
         logger.error(f"API Error: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/stats')
+def api_stats():
+    """Retrieve SQLite database statistics and email configuration status."""
+    try:
+        stats = database.get_db_stats()
+        stats['email_configured'] = notifier.is_email_configured()
+        return jsonify({
+            'success': True,
+            'stats': stats
+        })
+    except Exception as e:
+        logger.error(f"Error fetching stats: {e}")
+        return jsonify({
+            'success': False,
+            'error': str(e)
+        }), 500
+
+@app.route('/api/test-email', methods=['POST'])
+def api_test_email():
+    """Trigger a manual test email using current SMTP configuration."""
+    try:
+        if not notifier.is_email_configured():
+            return jsonify({
+                'success': False,
+                'error': 'SMTP settings are not fully configured in your .env file.'
+            }), 400
+            
+        test_note = {
+            'id': 'test-note-id',
+            'date': time.strftime('%B %d, %Y'),
+            'updated': time.strftime('%Y-%m-%dT%H:%M:%SZ'),
+            'link': 'https://github.com/steveviko/BigQuery',
+            'type': 'Feature',
+            'content_html': '<p>This is a test notification from your BigQuery Release Notes Explorer. Your SMTP settings are successfully configured!</p>',
+            'content_text': 'This is a test notification from your BigQuery Release Notes Explorer. Your SMTP settings are successfully configured!'
+        }
+        
+        success = notifier.send_email_notification([test_note])
+        if success:
+            return jsonify({
+                'success': True,
+                'message': 'Test email sent successfully! Please check your inbox.'
+            })
+        else:
+            return jsonify({
+                'success': False,
+                'error': 'Failed to send email. Check logs or SMTP settings.'
+            }), 500
+    except Exception as e:
+        logger.error(f"Test email error: {e}")
         return jsonify({
             'success': False,
             'error': str(e)

@@ -1145,3 +1145,127 @@ body {
     border-top: 1px solid rgba(255, 255, 255, 0.03);
     margin-top: auto;
 }
+
+/* System Status Bar */
+.system-status-bar {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: var(--bg-surface);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--border-color);
+    border-radius: var(--radius-md);
+    padding: 0.75rem 1.5rem;
+    font-size: 0.85rem;
+    box-shadow: 0 4px 15px rgba(0, 0, 0, 0.15);
+    margin-top: -1rem;
+    margin-bottom: 0.5rem;
+    animation: fadeIn var(--transition-normal);
+}
+
+.status-group {
+    display: flex;
+    align-items: center;
+    gap: 1.25rem;
+}
+
+.status-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+}
+
+.status-icon {
+    width: 16px;
+    height: 16px;
+    color: var(--text-secondary);
+}
+
+.status-icon.text-blue {
+    color: var(--color-primary);
+}
+
+.status-icon.text-green {
+    color: var(--color-feature);
+}
+
+.status-icon.text-orange {
+    color: var(--color-bq-orange);
+}
+
+.status-icon.text-red {
+    color: var(--color-breaking);
+}
+
+.status-label {
+    color: var(--text-secondary);
+    font-weight: 500;
+}
+
+.status-val {
+    color: var(--text-primary);
+    font-weight: 700;
+}
+
+.status-val.configured {
+    color: var(--color-feature);
+}
+
+.status-val.pending {
+    color: var(--color-bq-orange);
+}
+
+.status-separator {
+    width: 1px;
+    height: 14px;
+    background-color: var(--border-color);
+}
+
+.status-actions {
+    display: flex;
+    align-items: center;
+}
+
+.btn-xs {
+    padding: 0.35rem 0.75rem;
+    font-size: 0.75rem;
+    border-radius: 6px;
+}
+
+/* Toast notifications for feedback */
+.toast-notification {
+    position: fixed;
+    bottom: 2rem;
+    right: 2rem;
+    background: #1e293b;
+    border-left: 4px solid var(--color-primary);
+    color: var(--text-primary);
+    padding: 1rem 1.5rem;
+    border-radius: 6px;
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.3);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    animation: slideInUp 0.3s ease-out forwards;
+}
+
+.toast-notification.success {
+    border-left-color: var(--color-feature);
+}
+
+.toast-notification.error {
+    border-left-color: var(--color-breaking);
+}
+
+@keyframes slideInUp {
+    from { transform: translateY(100px); opacity: 0; }
+    to { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes fadeOut {
+    from { opacity: 1; }
+    to { opacity: 0; }
+}
+

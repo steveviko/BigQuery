@@ -94,6 +94,29 @@
             </div>
         </section>
 
+        <!-- System Status Dashboard -->
+        <section class="system-status-bar">
+            <div class="status-group">
+                <div class="status-item">
+                    <i data-lucide="database" class="status-icon text-blue"></i>
+                    <span class="status-label">Database:</span>
+                    <span id="db-total-count" class="status-val">Loading...</span>
+                </div>
+                <div class="status-separator"></div>
+                <div class="status-item">
+                    <i data-lucide="mail" class="status-icon text-orange" id="email-status-icon"></i>
+                    <span class="status-label">Email Notifications:</span>
+                    <span id="email-config-status" class="status-val pending">Checking...</span>
+                </div>
+            </div>
+            <div class="status-actions">
+                <button id="test-email-btn" class="btn btn-secondary btn-xs" title="Send a test email using current SMTP configuration" disabled>
+                    <i data-lucide="send"></i>
+                    <span>Test Email</span>
+                </button>
+            </div>
+        </section>
+
         <!-- Main Workspace -->
         <main class="main-content">
             <!-- Loading State -->

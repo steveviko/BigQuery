@@ -19,6 +19,12 @@ const filterChipsContainer = document.getElementById('filter-chips-container');
 const lastUpdatedText = document.getElementById('last-updated-text');
 const clearFiltersBtn = document.getElementById('clear-filters-btn');
 
+// System Stats DOM Elements
+const dbTotalCount = document.getElementById('db-total-count');
+const emailStatusIcon = document.getElementById('email-status-icon');
+const emailConfigStatus = document.getElementById('email-config-status');
+const testEmailBtn = document.getElementById('test-email-btn');
+
 // Floating Dock Elements
 const floatingShareDock = document.getElementById('floating-share-dock');
 const dockSelectedCount = document.getElementById('dock-selected-count');
@@ -85,6 +91,11 @@ function setupEventListeners() {
     
     // Post to X
     btnTweetNow.addEventListener('click', publishTweet);
+    
+    // Test Email Action
+    if (testEmailBtn) {
+        testEmailBtn.addEventListener('click', sendTestEmail);
+    }
 }
 
 // Fetch notes from Flask API
@@ -112,6 +123,7 @@ async function fetchNotes(bypassCache = false) {
             lastUpdatedTime = data.last_updated;
             lastUpdatedText.textContent = `Synced: ${lastUpdatedTime}`;
             renderUI();
+            fetchStats();
         } else {
             throw new Error(data.error || 'Unknown error occurred while fetching feed.');
         }
@@ -603,4 +615,105 @@ function publishTweet() {
     
     // Open X Intent
     window.open(intentUrl, '_blank', 'width=550,height=420,referrerpolicy=no-referrer');
+}
+
+// Fetch Database Stats & SMTP Status
+async function fetchStats() {
+    try {
+        const response = await fetch('/api/stats');
+        if (!response.ok) throw new Error('Failed to retrieve system status.');
+        const data = await response.json();
+        
+        if (data.success) {
+            // Update Database Stats
+            if (dbTotalCount) {
+                dbTotalCount.textContent = `${data.stats.total_notes} notes`;
+            }
+            
+            // Update Email Status
+            if (emailConfigStatus && emailStatusIcon && testEmailBtn) {
+                if (data.stats.email_configured) {
+                    emailConfigStatus.textContent = 'Active (Ready)';
+                    emailConfigStatus.className = 'status-val configured';
+                    emailStatusIcon.className = 'status-icon text-green';
+                    testEmailBtn.disabled = false;
+                } else {
+                    emailConfigStatus.textContent = 'Pending Setup';
+                    emailConfigStatus.className = 'status-val pending';
+                    emailStatusIcon.className = 'status-icon text-orange';
+                    testEmailBtn.disabled = true;
+                }
+            }
+        }
+    } catch (err) {
+        console.error('Error fetching database/email stats:', err);
+    }
+}
+
+// Trigger Manual Test Email
+async function sendTestEmail() {
+    if (!testEmailBtn) return;
+    
+    // Set loading state
+    testEmailBtn.disabled = true;
+    const origHtml = testEmailBtn.innerHTML;
+    testEmailBtn.innerHTML = '<i class="spinner-ring" style="width:12px;height:12px;margin-right:4px;display:inline-block;animation:rotate 1s linear infinite"></i>Sending...';
+    
+    try {
+        const response = await fetch('/api/test-email', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' }
+        });
+        
+        const data = await response.json();
+        if (response.ok && data.success) {
+            showToast('Test email sent successfully! Check your inbox.', 'success');
+        } else {
+            showToast(data.error || 'Failed to send test email.', 'error');
+        }
+    } catch (err) {
+        console.error('Error triggering test email:', err);
+        showToast('Error connecting to the test-email service.', 'error');
+    } finally {
+        testEmailBtn.disabled = false;
+        testEmailBtn.innerHTML = origHtml;
+        fetchStats(); // Update stats
+    }
+}
+
+// Visual Toast feedback helper
+function showToast(message, type = 'info') {
+    // Remove existing toast if present
+    const existingToast = document.querySelector('.toast-notification');
+    if (existingToast) {
+        existingToast.remove();
+    }
+    
+    const toast = document.createElement('div');
+    toast.className = `toast-notification ${type}`;
+    
+    // Choose icon
+    let iconName = 'info';
+    if (type === 'success') iconName = 'check-circle';
+    if (type === 'error') iconName = 'alert-triangle';
+    
+    toast.innerHTML = `
+        <i data-lucide="${iconName}"></i>
+        <span>${message}</span>
+    `;
+    
+    document.body.appendChild(toast);
+    
+    // Initialize icon
+    if (window.lucide) {
+        window.lucide.createIcons({
+            attrs: { class: 'toast-icon' }
+        });
+    }
+    
+    // Fade out after 4 seconds
+    setTimeout(() => {
+        toast.style.animation = 'fadeOut 0.5s ease-out forwards';
+        setTimeout(() => toast.remove(), 500);
+    }, 4000);
 }

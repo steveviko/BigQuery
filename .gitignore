@@ -1,0 +1,16 @@
+# Python caching
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Databases
+notes.db
+
+# Local environment configuration
+.env
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
